@@ -1,24 +1,36 @@
+#include "buffers.h"
 #include "term_utils.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-int main(int argc, char **argv) {
+int main(void) {
 
   //         setup
   // --------------------------
-  
+
   enable_raw_mode();
   clear_screen();
-  switch_to_back_buffer();
   fflush(stdout);
-  
+
+  int width = 100;
+  TBufferPair tbuffers = new_tbuffer_pair(width, 100);
+
   // --------------------------
 
+  // WindowSize ws = get_window_size();
+  //  move_cursor(ws.char_x / 2, ws.char_y / 2);
+  //  fflush(stdout);
 
-  WindowSize ws = get_window_size();
-  move_cursor(ws.char_x / 2, ws.char_y / 2);
-  printf("Hello");
-  fflush(stdout);
-  sleep(1);
+  for (int i = 0; i < 10000; i++) {
+    char c = '*';
+    if ((i % width) == width - 1 || (i % width) == 0) {
+      c = '|';
+    }
+    write_to_back_tbuffer(&tbuffers, c, i % width, i / width);
+  }
+
+  write_to_back_tbuffer(&tbuffers, '0', width - 1, width);
 
   char c;
   char break_key = 'q';
@@ -30,10 +42,10 @@ int main(int argc, char **argv) {
         break;
       }
     }
+    clear_screen();
+    display_front_tbuffer(&tbuffers);
   }
 
-
-  
   //           end
   // -------------------------
   clear_screen();

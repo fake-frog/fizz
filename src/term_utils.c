@@ -9,15 +9,15 @@
 
 /*
   ====================================
-  
+
   This is a bunch of junk and flags,
   that a terminal understands to set
   it into the right mode. Also escape
   sequences to set do do things like
   move the cursor.
-  
+
   ====================================
- */
+*/
 
 struct termios orig_termios;
 
@@ -27,8 +27,8 @@ void move_cursor(int x, int y) {
   printf("\033[%d;%dH", y, x);
 }
 
-void switch_to_back_buffer() { printf("\033[?1049h"); }
-void switch_to_main_buffer() { printf("\033[?1049l"); }
+static void switch_to_back_buffer() { printf("\033[?1049h"); }
+static void switch_to_main_buffer() { printf("\033[?1049l"); }
 // Clear screen and move to top-left
 void clear_screen() { printf("\033[2J\033[H"); }
 

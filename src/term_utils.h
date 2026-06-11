@@ -12,9 +12,7 @@ void move_cursor(int x, int y);
 void clear_screen();
 void disable_raw_mode();
 void enable_raw_mode();
-void non_blocking_input();
-void switch_to_back_buffer();
-void switch_to_main_buffer();
+void non_blocking_input(); // dont wait for input
 WindowSize get_window_size();
 
 #endif

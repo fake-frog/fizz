@@ -1,3 +1,3 @@
-#include "src/term_utils.c"
+#include "src/buffers.c"
 #include "src/main.c"
-#include "src/grfx.c"
+#include "src/term_utils.c"
