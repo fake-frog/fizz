@@ -13,7 +13,7 @@
   This is a bunch of junk and flags,
   that a terminal understands to set
   it into the right mode. Also escape
-  sequences to set do do things like
+  sequences to set / do things like
   move the cursor.
 
   ====================================

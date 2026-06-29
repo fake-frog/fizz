@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-int main(void) {
+int main(int argsc, char **argsv) {
 
   //         setup
   // --------------------------
@@ -13,27 +13,28 @@ int main(void) {
   clear_screen();
   fflush(stdout);
 
-  int width = 100;
-  TBufferPair tbuffers = new_tbuffer_pair(width, 100);
-
+  WindowSize win_size = get_window_size();
+  
+  int width = 120;
+  int height = 40;
+  TScreen tscreen = new_tscreen(win_size.char_x, win_size.char_y, width, height);
+  
   // --------------------------
 
-  // WindowSize ws = get_window_size();
-  //  move_cursor(ws.char_x / 2, ws.char_y / 2);
-  //  fflush(stdout);
-
-  for (int i = 0; i < 10000; i++) {
-    char c = '*';
+  for (int i = 0; i < width * height; i++) {
+    char c = ' ';
     if ((i % width) == width - 1 || (i % width) == 0) {
       c = '|';
     }
-    write_to_back_tbuffer(&tbuffers, c, i % width, i / width);
+    
+    write_to_back_tbuffer(&tscreen.tbuffers, c, i % width, i / width);
   }
-
-  write_to_back_tbuffer(&tbuffers, '0', width - 1, width);
 
   char c;
   char break_key = 'q';
+  char update_key = 'l';
+
+  display_front_tbuffer(&tscreen);
 
   while (1) {
     int bytes_read = read(STDIN_FILENO, &c, 1);
@@ -41,11 +42,18 @@ int main(void) {
       if (c == break_key) {
         break;
       }
+      
+      // there is a bug here (double free or curuption)
+      if (c == update_key) {
+	clear_screen();
+	write_to_back_tbuffer(&tscreen.tbuffers, '*', width / 2, height /2);
+	write_to_back_tbuffer(&tscreen.tbuffers, '*', width -1, 0);
+	display_front_tbuffer(&tscreen);
+      }
     }
-    clear_screen();
-    display_front_tbuffer(&tbuffers);
+    usleep(16667);
   }
-
+  
   //           end
   // -------------------------
   clear_screen();
