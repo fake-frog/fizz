@@ -27,14 +27,14 @@ int main(int argsc, char **argsv) {
       c = '|';
     }
     
-    write_to_back_tbuffer(&tscreen.tbuffers, c, i % width, i / width);
+    set_cell(&tscreen, c, i % width, i / width);
   }
 
   char c;
   char break_key = 'q';
   char update_key = 'l';
 
-  display_front_tbuffer(&tscreen);
+  display(&tscreen);
 
   while (1) {
     int bytes_read = read(STDIN_FILENO, &c, 1);
@@ -46,9 +46,9 @@ int main(int argsc, char **argsv) {
       // there is a bug here (double free or curuption)
       if (c == update_key) {
 	clear_screen();
-	write_to_back_tbuffer(&tscreen.tbuffers, '*', width / 2, height /2);
-	write_to_back_tbuffer(&tscreen.tbuffers, '*', width -1, 0);
-	display_front_tbuffer(&tscreen);
+	set_cell(&tscreen, '*', width / 2, height /2);
+	set_cell(&tscreen, '*', width -1, 0);
+	display(&tscreen);
       }
     }
     usleep(16667);
