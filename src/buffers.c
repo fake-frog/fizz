@@ -5,35 +5,37 @@
 
 
 static TBuffer new_tbuffer(int width, int height);
-static int insert_char_chunk(char *buff, int start, int len, char c);
-static int insert_newline(char *buff, int start);
+static int     insert_buff(char *buff, char *ins_buff, int start, int len);
+static int     insert_char_chunk(char *buff, int start, int len, char c);
+static int     insert_newline(char *buff, int start);
 
 
 // returns ending pos
-static int insert_char_chunk(char *buff, int start, int len, char c) {
-  
-  char ins_buff[len];
-  memset(ins_buff, c, len);
-  int tail_len = strlen(buff) - start;
+static int insert_buff(char *buff, char *ins_buff, int start, int len) {
 
+  int tail_len = strlen(buff) - start;
   memmove(buff + start + len, buff + start, tail_len + 1);
   memcpy(buff + start, ins_buff, len);
-
+  
   return start + len;
 }
 
 
-// returns ending pos
+static int insert_char_chunk(char *buff, int start, int len, char c) {
+  
+  char ins_buff[len];
+  memset(ins_buff, c, len);
+  
+  return insert_buff(buff, ins_buff, start, len);
+}
+
+
 static int insert_newline(char *buff, int start) {
   
   const int len = 2;
   char ins_buff[2] = "\r\n";
-  int tail_len = strlen(buff) - start;
-
-  memmove(buff + start + len, buff + start, tail_len + 1);
-  memcpy(buff + start, ins_buff, len);
   
-  return start + len;
+  return insert_buff(buff, ins_buff, start, len);
 }
 
 
@@ -47,6 +49,7 @@ static TBuffer new_tbuffer(int width, int height) {
 }
 
 
+// TODO: fix crash when screen w or h is < buff w or h
 TScreen new_tscreen(int win_w, int win_h, int buff_w, int buff_h) {
   
   TBuffer tbuffer = new_tbuffer(buff_w, buff_h);
@@ -86,7 +89,7 @@ char *pad_tbuffer(TScreen *tscreen) {
   // insert sides
   for (int i = 0; i < buffer_h; i++) {
     next_pos  = insert_char_chunk(new_buffer, next_pos, left_pad, ' ');
-    next_pos += buffer_w; // shift width
+    next_pos += buffer_w; // shift to end of line
     next_pos  = insert_newline(new_buffer, next_pos);
   }
   
@@ -100,12 +103,13 @@ void set_cell(TScreen *tscreen, char c, int x, int y) {
   
   int buffer_h = tscreen->tbuffer.height;
   int buffer_w = tscreen->tbuffer.width;
+  int buffer_s = tscreen->tbuffer.size;
   
   int loc = (y * buffer_w) + x;
   
-  if (x >= buffer_w || x < 0)   return; // outside x
-  if (y >= buffer_h || y < 0)  return; // outside y
-  if (loc < 0 || loc > tscreen->tbuffer.size) return; // past end
+  if (x >= buffer_w  || x < 0)   return; // outside x
+  if (y >= buffer_h  || y < 0)   return; // outside y
+  if (loc > buffer_s || loc < 0) return; // is valid loc
   
   tscreen->tbuffer.buff[loc] = c;
   
