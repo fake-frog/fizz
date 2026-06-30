@@ -6,6 +6,7 @@
 
 static TBuffer new_tbuffer(int size, int width, int height);
 static int insert_char_chunk(char *buff, int start, int len, char c);
+static int insert_newline(char *buff, int start);
 
 // returns ending pos
 static int insert_char_chunk(char *buff, int start, int len, char c) {
@@ -19,53 +20,61 @@ static int insert_char_chunk(char *buff, int start, int len, char c) {
   return start + len;
 }
 
+static int insert_newline(char *buff, int start) {
+  const int len = 2;
+  char ins_buff[2] = "\r\n";
+  int tail_len = strlen(buff) - start;
+
+  memmove(buff + start + len, buff + start, tail_len + 1);
+  memcpy(buff + start, ins_buff, len);
+  
+  return start + len;
+}
+
 
 static TBuffer new_tbuffer(int size, int width, int height) {
-
   char *new_buff = (char *)calloc(size + 1, sizeof(char));
   new_buff[size] = '\0';
-  /*
-  char *new_buff_padded = (char *)calloc(size_padded, sizeof(char));
-  
-  for (int i = width; i < size_padded; i += width + 2) {
-    new_buff_padded[i] = '\n';
-    new_buff_padded[i + 1] = '\r';
-  }
-
-  new_buff_padded[size_padded - 2] = '\0';
-  */
   return (TBuffer){size, width, height, new_buff};
 }
 
 TScreen new_tscreen(int win_w, int win_h, int buff_w, int buff_h) {
-
   TBufferPair tbuffers = new_tbuffer_pair(buff_w, buff_h);
   return (TScreen){win_w, win_h, tbuffers};
 }
 
+
 char *pad_tbuffer(TScreen *tscreen) {
-  int tscreen_size = tscreen->win_w * tscreen->win_h;
+  
+  int top_pad  = (tscreen->win_h - tscreen->tbuffers.front.height) / 2;
+  int left_pad = (tscreen->win_w - tscreen->tbuffers.front.width) / 2;
+
+  // the top padding added plus the left padding * the width plus \r\n
+  int tscreen_size = (top_pad * 2)
+    + tscreen->tbuffers.front.height
+    * (left_pad + tscreen->tbuffers.front.width + 2) + 1;
+   
   char* new_buffer = (char *)calloc(tscreen_size + 1, sizeof(char));
   memcpy(new_buffer, tscreen->tbuffers.front.buff, tscreen->tbuffers.front.size);
+
+  int next_pos = 0; // next insert position
   
   // insert top
-  int last_pos = insert_char_chunk(new_buffer, 0,
-		 ((tscreen->win_h - tscreen->tbuffers.front.height) / 2)
-		 * tscreen->win_w, ' ');
+  for (int i = 0; i < top_pad; i++) {
+    next_pos = insert_newline(new_buffer, next_pos);
+  }
 
   // insert sides
   for (int i = 0; i < tscreen->tbuffers.front.height; i++) {
-    last_pos = insert_char_chunk(new_buffer, last_pos,
-	       (tscreen->win_w - tscreen->tbuffers.front.width) / 2, ' ');
-    
-    last_pos = insert_char_chunk(new_buffer, last_pos
-	       + tscreen->tbuffers.front.width,
-	       (tscreen->win_w - tscreen->tbuffers.front.width) / 2, ' ');
+    next_pos = insert_char_chunk(new_buffer, next_pos, left_pad, ' ');
+    next_pos += tscreen->tbuffers.front.width;
+    next_pos = insert_newline(new_buffer, next_pos);
   }
   
   new_buffer[tscreen_size] = '\0';
   return new_buffer;
 }
+
 
 TBufferPair new_tbuffer_pair(int width, int height) {
   int size = width * height;
@@ -105,7 +114,7 @@ void display_front_tbuffer(TScreen *tscreen) {
   // this needs to return a new buffer
   char *padded_buffer = pad_tbuffer(tscreen);
   printf("%s", padded_buffer);
-  free(padded_buffer);
+  free(padded_buffer); // this is wastfull
 
   fflush(stdout);
 }

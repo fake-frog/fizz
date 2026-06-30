@@ -15,14 +15,14 @@ int main(int argsc, char **argsv) {
 
   WindowSize win_size = get_window_size();
   
-  int width = 120;
-  int height = 40;
+  int width = 155;
+  int height = 50;
   TScreen tscreen = new_tscreen(win_size.char_x, win_size.char_y, width, height);
   
   // --------------------------
 
   for (int i = 0; i < width * height; i++) {
-    char c = ' ';
+    char c = '-';
     if ((i % width) == width - 1 || (i % width) == 0) {
       c = '|';
     }
