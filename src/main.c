@@ -59,6 +59,9 @@ int main(int argsc, char **argsv) {
       // there is a bug here (double free or curuption)
       if (c == update_key) {
 	clear_screen();
+	win_size = get_window_size();
+	tscreen = new_tscreen(win_size.char_x, win_size.char_y, buff_w, buff_h);
+	fill_buffer(&tscreen, ' ', buff_w, buff_h);
 	set_cell(&tscreen, '+', buff_w / 2, buff_h /2);
 	set_cell(&tscreen, '+', 0, 0);
 	set_cell(&tscreen, '+', buff_w - 1, 0);
