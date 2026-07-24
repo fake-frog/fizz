@@ -1,20 +1,20 @@
-#include "buffers.h"
+#include "tscreen.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include "term_utils.h"
 
 static TBuffer new_tbuffer(int width, int height);
-static int     insert_buff(char *buff, int capacity, char *ins_buff, int start, int len);
-static int     insert_char_chunk(char *buff, int capacity, int start, int len, char c);
-static int     insert_newline(char *buff, int capacity, int start);
-static int     remove_char_chunk(char *buff, int capacity, int start, int len);
-static char   *center_tbuffer(TScreen *tscreen);
+static void check_bounds(int capacity, int tail_len, int start, int len);
+static int insert_buff(char *buff, int capacity, char *ins_buff, int start, int len);
+static int insert_char_chunk(char *buff, int capacity, int start, int len, char c);
+static int insert_newline(char *buff, int capacity, int start);
+static int remove_char_chunk(char *buff, int capacity, int start, int len);
+static char *center_tbuffer(TScreen *tscreen);
 
-// returns ending pos
-static int insert_buff(char *buff, int capacity, char *ins_buff, int start, int len) {
 
-  int tail_len = strlen(buff) - start;
+// kinda just placeholder for now
+static void check_bounds(int capacity, int tail_len, int start, int len) {
 
   if (tail_len < 0 || start < 0 || len < 0) {
     fprintf(stderr, "Bad Bounds\n");
@@ -26,6 +26,13 @@ static int insert_buff(char *buff, int capacity, char *ins_buff, int start, int 
     abort();
   }
   
+}
+
+// returns ending pos
+static int insert_buff(char *buff, int capacity, char *ins_buff, int start, int len) {
+
+  int tail_len = strlen(buff) - start;
+  check_bounds(capacity, tail_len, start, len);
   memmove(buff + start + len, buff + start, tail_len + 1);
   memcpy(buff + start, ins_buff, len);
   
@@ -54,17 +61,7 @@ static int insert_newline(char *buff, int capacity, int start) {
 static int remove_char_chunk(char *buff, int capacity, int start, int len) {
   
   int tail_len = strlen(buff) - start;
-
-  if (tail_len < 0 || start < 0 || len < 0) {
-    fprintf(stderr, "Bad Bounds\n");
-    abort();
-  }
-
-  if (start + len > capacity) {
-    fprintf(stderr, "Out of Bounds\n");
-    abort();
-  }
-  
+  check_bounds(capacity, tail_len, start, len);  
   memmove(buff + start, buff + start + len, tail_len + 1);
   
   return start;  
@@ -126,9 +123,11 @@ static char *center_tbuffer(TScreen *tscreen) {
   //insert left padding
   for (int i = 0; i < buffer_h; i++) {
     next_pos  = insert_char_chunk(new_buffer, tscreen_size + 1, next_pos, left_pad, ' ');
-    
+
+
     if (buffer_w > tscreen->win_w) {
       next_pos += tscreen->win_w;
+      // remove off screen characters
       remove_char_chunk(new_buffer, tscreen_size + 1, next_pos, buffer_w - tscreen->win_w);
     } else {
       next_pos += buffer_w;
@@ -159,12 +158,27 @@ void set_cell(TScreen *tscreen, char c, int x, int y) {
   
 }
 
+void tscreen_print(TScreen *tscreen, char *str, int x, int y) {
+  int buffer_h = tscreen->tbuffer.height;
+  int buffer_w = tscreen->tbuffer.width;
+  int buffer_s = tscreen->tbuffer.size;
+  
+  int loc = (y * buffer_w) + x;
+
+  if (x >= buffer_w  || x < 0)   return; // outside x
+  if (y >= buffer_h  || y < 0)   return; // outside y
+  if (loc > buffer_s || loc < 0) return; // is valid loc
+
+  for (int i = 0; i < strlen(str); i++) {
+    if (loc + i >= tscreen->tbuffer.size) break;  
+    tscreen->tbuffer.buff[loc + i] = str[i];
+  }
+
+}
 
 void display(TScreen *tscreen) {
-  
+  move_cursor(0, 0);
   char *centered_buffer = center_tbuffer(tscreen);
   printf("%s", centered_buffer);
   free(centered_buffer); // this is wastfull; maybe keep in tscreen?
-  fflush(stdout);
-  
 }
