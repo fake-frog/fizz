@@ -12,7 +12,7 @@ void handle_winch(int sig) {
 }
 
 
-void fill_buffer(TScreen *tscreen, char c, int bw, int bh) {
+void fill_buffer(TBuffer *tbuffer, char c, int bw, int bh) {
 
   for (int i = 0; i < bw * bh; i++) {
     char ca = c;
@@ -26,12 +26,12 @@ void fill_buffer(TScreen *tscreen, char c, int bw, int bh) {
     
     if (top_bottom)   ca = '-';
     if (left_right)   ca = '|';
-    if (top_left)     ca = '@';
-    if (top_right)    ca = '@';
-    if (bottom_left)  ca = '@';
-    if (bottom_right) ca = '@';
+    if (top_left)     ca = ' ';
+    if (top_right)    ca = ' ';
+    if (bottom_left)  ca = ' ';
+    if (bottom_right) ca = ' ';
     
-    set_cell(tscreen, ca, i % bw, i / bw);
+    set_cell(tbuffer, ca, i % bw, i / bw);
   }
   
 }
@@ -59,7 +59,10 @@ int main(int argsc, char **argsv) {
   char break_key = 'q';
   char update_key = 'l';
 
-  fill_buffer(&tscreen, ' ', buff_w, buff_h);
+  fill_buffer(&tscreen.tbuffer, ' ', DISPLAY_W + LOG_W, LOG_H);
+  fill_buffer(&tscreen.display, ' ', DISPLAY_W, DISPLAY_H);
+  fill_buffer(&tscreen.log, ' ', LOG_W, LOG_H);
+  fill_buffer(&tscreen.meter, ' ', METER_W, METER_H);
   
   display(&tscreen);
   
@@ -71,9 +74,14 @@ int main(int argsc, char **argsv) {
 
     if (resize) {
       clear_screen();
+      free_tscreen(&tscreen);
       win_size = get_window_size();
       tscreen = new_tscreen(win_size.char_x, win_size.char_y, buff_w, buff_h);
-      fill_buffer(&tscreen, ' ', buff_w, buff_h);
+      fill_buffer(&tscreen.tbuffer, ' ', DISPLAY_W + LOG_W, LOG_H);
+      fill_buffer(&tscreen.display, ' ', DISPLAY_W, DISPLAY_H);
+      fill_buffer(&tscreen.log, ' ', LOG_W, LOG_H);
+      fill_buffer(&tscreen.meter, ' ', METER_W, METER_H);
+  
       display(&tscreen);
       resize = 0;
     }
@@ -83,7 +91,6 @@ int main(int argsc, char **argsv) {
         break;
       }
       
-      // there is a bug here (double free or curuption)
       if (c == update_key) {
 	
       }
@@ -97,5 +104,4 @@ int main(int argsc, char **argsv) {
   // -----------------------------------------------
   clear_screen();
   disable_raw_mode();
-  
 }

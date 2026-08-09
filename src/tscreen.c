@@ -5,74 +5,14 @@
 #include "term_utils.h"
 
 static TBuffer new_tbuffer(int width, int height);
-static void check_bounds(int capacity, int tail_len, int start, int len);
-static int insert_buff(char *buff, int capacity, char *ins_buff, int start, int len);
-static int insert_char_chunk(char *buff, int capacity, int start, int len, char c);
-static int insert_newline(char *buff, int capacity, int start);
-static int remove_char_chunk(char *buff, int capacity, int start, int len);
 static char *center_tbuffer(TScreen *tscreen);
-
-
-// kinda just placeholder for now
-static void check_bounds(int capacity, int tail_len, int start, int len) {
-
-  if (tail_len < 0 || start < 0 || len < 0) {
-    fprintf(stderr, "Bad Bounds\n");
-    abort();
-  }
-
-  if (start + len > capacity) {
-    fprintf(stderr, "Out of Bounds\n");
-    abort();
-  }
-  
-}
-
-// returns ending pos
-static int insert_buff(char *buff, int capacity, char *ins_buff, int start, int len) {
-
-  int tail_len = strlen(buff) - start;
-  check_bounds(capacity, tail_len, start, len);
-  memmove(buff + start + len, buff + start, tail_len + 1);
-  memcpy(buff + start, ins_buff, len);
-  
-  return start + len;
-}
-
-
-static int insert_char_chunk(char *buff, int capacity, int start, int len, char c) {
-  
-  char ins_buff[len];
-  memset(ins_buff, c, len);
-  
-  return insert_buff(buff, capacity, ins_buff, start, len);
-}
-
-
-static int insert_newline(char *buff, int capacity, int start) {
-  
-  const int len = 2;
-  char ins_buff[2] = "\r\n";
-  
-  return insert_buff(buff, capacity, ins_buff, start, len);
-}
-
-
-static int remove_char_chunk(char *buff, int capacity, int start, int len) {
-  
-  int tail_len = strlen(buff) - start;
-  check_bounds(capacity, tail_len, start, len);  
-  memmove(buff + start, buff + start + len, tail_len + 1);
-  
-  return start;  
-}
+static void stitch_buffs(TScreen *tscreen);
 
 
 static TBuffer new_tbuffer(int width, int height) {
   
   int size = width * height;
-  char *new_buff = (char *)calloc(size + 1, sizeof(char));
-  new_buff[size] = '\0';
+  char *new_buff = (char *)calloc(size, sizeof(char));
   
   return (TBuffer){size, width, height, new_buff};
 }
@@ -80,73 +20,99 @@ static TBuffer new_tbuffer(int width, int height) {
 
 TScreen new_tscreen(int win_w, int win_h, int buff_w, int buff_h) {
   
-  TBuffer tbuffer = new_tbuffer(buff_w, buff_h);
+  TBuffer tbuffer = new_tbuffer(DISPLAY_W + LOG_W, LOG_H);
+  TBuffer display = new_tbuffer(DISPLAY_W, DISPLAY_H);
+  TBuffer log     = new_tbuffer(LOG_W, LOG_H);
+  TBuffer meter   = new_tbuffer(METER_W, METER_H);
   
-  return (TScreen){win_w, win_h, tbuffer};
+  return (TScreen){win_w, win_h, tbuffer, display, log, meter};
 }
 
 
 void free_tscreen(TScreen *tscreen) {
   
   free(tscreen->tbuffer.buff);
+  free(tscreen->display.buff);
+  free(tscreen->log.buff);
+  free(tscreen->meter.buff);
   
+}
+
+
+static void stitch_buffs(TScreen *tscreen) {
+    
+  int dh = tscreen->display.height;
+  int dw = tscreen->display.width;
+  int lw = tscreen->log.width;
+  int mw = tscreen->meter.width;
+  int mh = tscreen->meter.height;
+
+  if (tscreen->tbuffer.size < (dw+lw)*dh + (mw+lw)*mh) {
+    fprintf(stderr, "Buffer size too small");
+    abort();
+  }
+  
+  // just copy the lines over
+  for (int i = 0; i < dh; i++) {
+    char *b_start = tscreen->tbuffer.buff + (dw + lw) * i;
+    char *d_start = tscreen->display.buff + dw * i;
+    char *l_start = tscreen->log.buff + lw * i;
+    memcpy(b_start, d_start, dw);
+    memcpy(b_start + dw, l_start, lw);
+  }
+
+  int offset = (dw + lw) * dh;
+
+  for (int i = 0; i < mh; i++) {
+    char *b_start = tscreen->tbuffer.buff + (mw + lw) * i + offset;
+    char *m_start = tscreen->meter.buff + mw * i;
+    char *l_start = tscreen->log.buff + lw * (dh + i);
+    memcpy(b_start, m_start, mw);
+    memcpy(b_start + mw, l_start, lw);
+  }
 }
 
 
 static char *center_tbuffer(TScreen *tscreen) {
   
-  int buffer_h = tscreen->tbuffer.height;
-  int buffer_w = tscreen->tbuffer.width;
-  int top_pad  = (tscreen->win_h - buffer_h) / 2;
-  int left_pad = (tscreen->win_w - buffer_w) / 2;
-  
-  if (top_pad < 0)  top_pad = 0;
+  int bh = tscreen->tbuffer.height;
+  int bw = tscreen->tbuffer.width;
+
+  int top_pad  = (tscreen->win_h - bh) / 2;
+  int left_pad = (tscreen->win_w - bw) / 2;
+  if (top_pad  < 0) top_pad  = 0;
   if (left_pad < 0) left_pad = 0;
 
-  int padded_w = (left_pad + buffer_w + 2);
-    
-  // the top padding added plus the left padding * the width + \r\n len
-  int tscreen_size = (top_pad * 2) + (buffer_h * padded_w);
-  int tbuffer_size = tscreen->tbuffer.size;
-  
-  char* new_buffer = (char *)calloc(tscreen_size + 1, sizeof(char)); // extra char for \0
-  memcpy(new_buffer, tscreen->tbuffer.buff, tbuffer_size);
-  new_buffer[tscreen_size] = '\0';
+  int cols  = bw < tscreen->win_w ? bw : tscreen->win_w;   // clip width
+  int avail = tscreen->win_h - top_pad - 1;
+  int rows  = bh < avail ? bh : avail;                     // clip height
+  if (rows < 0) rows = 0;
 
-  int next_pos = 0; // next insert position
+  int cap = top_pad * 2 + rows * (left_pad + cols + 2) + 1;
+  char *out = malloc(cap);
 
-  //insert top padding
-  for (int i = 0; i < top_pad; i++) {
-    next_pos = insert_newline(new_buffer, tscreen_size, next_pos);
-  }
-
-  //insert left padding
-  for (int i = 0; i < buffer_h; i++) {
-    next_pos  = insert_char_chunk(new_buffer, tscreen_size + 1, next_pos, left_pad, ' ');
-
-
-    if (buffer_w > tscreen->win_w) {
-      next_pos += tscreen->win_w;
-      // remove off screen characters
-      remove_char_chunk(new_buffer, tscreen_size + 1, next_pos, buffer_w - tscreen->win_w);
-    } else {
-      next_pos += buffer_w;
-    }
-    
-    next_pos  = insert_newline(new_buffer, tscreen_size + 1, next_pos);
+  int p = 0;
+  for (int i = 0; i < top_pad; i++) { out[p++] = '\r'; out[p++] = '\n'; }
+  for (int y = 0; y < rows; y++) {
+    memset(out + p, ' ', left_pad);
+    p += left_pad;
+    memcpy(out + p, tscreen->tbuffer.buff + y * bw, cols);
+    p += cols;
+    out[p++] = '\r';
+    out[p++] = '\n';
   }
   
-  new_buffer[tscreen_size] = '\0';
-
-  return new_buffer;
+  out[p] = '\0';
+  
+  return out;
 }
 
 
-void set_cell(TScreen *tscreen, char c, int x, int y) {
+void set_cell(TBuffer *tbuffer, char c, int x, int y) {
   
-  int buffer_h = tscreen->tbuffer.height;
-  int buffer_w = tscreen->tbuffer.width;
-  int buffer_s = tscreen->tbuffer.size;
+  int buffer_h = tbuffer->height;
+  int buffer_w = tbuffer->width;
+  int buffer_s = tbuffer->size;
   
   int loc = (y * buffer_w) + x;
 
@@ -154,9 +120,10 @@ void set_cell(TScreen *tscreen, char c, int x, int y) {
   if (y >= buffer_h  || y < 0)   return; // outside y
   if (loc > buffer_s || loc < 0) return; // is valid loc
   
-  tscreen->tbuffer.buff[loc] = c;
+  tbuffer->buff[loc] = c;
   
 }
+
 
 void tscreen_print(TScreen *tscreen, char *str, int x, int y) {
   int buffer_h = tscreen->tbuffer.height;
@@ -176,9 +143,12 @@ void tscreen_print(TScreen *tscreen, char *str, int x, int y) {
 
 }
 
+
 void display(TScreen *tscreen) {
   move_cursor(0, 0);
+  stitch_buffs(tscreen);
   char *centered_buffer = center_tbuffer(tscreen);
   printf("%s", centered_buffer);
   free(centered_buffer); // this is wastfull; maybe keep in tscreen?
+  fflush(stdout);
 }
